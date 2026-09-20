@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PrintCampus — Online Photocopy & Printing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ---- Design tokens: grounded in a print/copy-shop ticket & receipt aesthetic ----
+   paper  = warm stock paper background (not the generic AI-cream)
+   ink    = near-black toner brown, not pure #000
+   brand  = ink-cartridge red — the CTA / "print" color
+   accent = rubber-stamp green — used for confirmations, approvals
+   mono   = IBM Plex Mono for anything a receipt printer would print: IDs, amounts, OTP
+*/
+:root{
+  --paper:#f3ede0; --panel:#fffdf7; --panel-2:#ece3cf; --ink:#241d15; --ink-2:#7a6d54;
+  --line:#ddd0ac; --brand:#a3121f; --brand-ink:#fff8f0; --accent:#1f6e4c;
+  --danger:#8f1f1f; --warn:#8a5a12; --shadow:0 14px 30px -12px rgba(43,32,10,.28);
+  --radius:12px; --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#1a1611; --panel:#241f17; --panel-2:#2d271c; --ink:#f3ecd9; --ink-2:#b4a689;
+    --line:#3c3324; --brand:#e2626a; --accent:#4bb98a; --danger:#f0847e; --warn:#e6b25a;
+    --shadow:0 14px 30px -10px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#1a1611; --panel:#241f17; --panel-2:#2d271c; --ink:#f3ecd9; --ink-2:#b4a689;
+  --line:#3c3324; --brand:#e2626a; --accent:#4bb98a; --danger:#f0847e; --warn:#e6b25a;
+  --shadow:0 14px 30px -10px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:Inter,"Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  font-size:15px;line-height:1.55;
+  background-image:radial-gradient(color-mix(in srgb,var(--ink) 5%,transparent) 1px,transparent 1px);
+  background-size:22px 22px;
+}
+h1,h2,h3,.brand{font-family:"Plus Jakarta Sans",Inter,system-ui,Arial,sans-serif;letter-spacing:-.02em}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.wrap{max-width:980px;margin:auto;padding:0 16px}
+header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(8px);border-bottom:2px dashed var(--line)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0}
+.brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:800;cursor:pointer}
+.logo{width:34px;height:34px;border-radius:50%;background:var(--brand);display:grid;place-items:center;color:var(--brand-ink);font-size:16px;border:2px solid color-mix(in srgb,var(--brand) 60%,black 15%)}
+.bar-actions{display:flex;gap:8px;align-items:center}
+.ghost{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 12px;border-radius:9px;font-weight:600;font-size:13px;cursor:pointer;transition:border-color .15s ease,color .15s ease}
+.ghost:hover{border-color:var(--brand);color:var(--brand)}
+main{padding:22px 0 70px}
+.hero{text-align:center;padding:18px 0 24px}
+.hero h1{font-size:32px;margin:0 0 8px;line-height:1.12}
+.hero p{margin:0 auto;max-width:46ch;color:var(--ink-2)}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.tile{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;cursor:pointer;text-align:left;color:inherit;font:inherit;transition:transform .15s ease,box-shadow .15s ease}
+.tile::after{content:"";position:absolute;left:16px;right:16px;bottom:0;border-bottom:1px dashed color-mix(in srgb,var(--line) 80%,transparent)}
+.tile:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.tile:hover .ic{background:var(--brand);color:var(--brand-ink)}
+.tile .ic{width:38px;height:38px;border-radius:50%;background:var(--panel-2);color:var(--ink);display:grid;place-items:center;font-size:18px;margin-bottom:12px;transition:background .15s ease,color .15s ease}
+.tile b{display:block;font-size:16px;font-family:"Plus Jakarta Sans",sans-serif;margin-bottom:2px}
+.tile span{color:var(--ink-2);font-size:13px}
+.page{display:none}
+.page.on{display:block;animation:in .22s ease}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.back{background:none;border:0;color:var(--brand);font-weight:700;cursor:pointer;padding:0;margin-bottom:12px;font-size:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
+.card h2{margin:0 0 4px;font-size:19px}
+.card .sub{color:var(--ink-2);font-size:13px;margin:0 0 14px}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin:12px 0 6px}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--ink);font:inherit}
+input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:1px;border-color:var(--brand)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.drop{display:block;border:2px dashed color-mix(in srgb,var(--brand) 40%,var(--line));border-radius:10px;padding:22px;text-align:center;background:color-mix(in srgb,var(--brand) 5%,var(--panel-2));cursor:pointer;transition:background .15s ease}
+.drop.dragover{background:color-mix(in srgb,var(--brand) 13%,var(--panel-2))}
+.drop input{display:none}
+.drop b{display:block;font-size:15px}
+.drop small{color:var(--ink-2)}
+.files{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.file{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+.file img,.file .ph{width:42px;height:42px;border-radius:6px;object-fit:cover;background:var(--panel);display:grid;place-items:center;font-size:18px;flex:none}
+.file .meta{flex:1;min-width:0}
+.file .meta b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file .meta small{color:var(--ink-2)}
+.x{border:0;background:none;color:var(--danger);font-size:17px;cursor:pointer;padding:4px 8px}
+
+/* Bill: styled like a printed receipt — perforated top edge + dashed rule before total */
+.bill{position:relative;background:var(--ink);color:var(--paper);border-radius:2px;padding:20px 18px 16px;margin-top:18px}
+.bill::before{content:"";position:absolute;top:-7px;left:0;right:0;height:14px;
+  background:radial-gradient(circle at 10px 7px,var(--paper) 6px,transparent 6.5px) repeat-x;background-size:20px 14px}
+.bill .l{display:flex;justify-content:space-between;gap:16px;margin:7px 0;font-size:13.5px;color:color-mix(in srgb,var(--paper) 78%,transparent)}
+.bill .l span:last-child{font-family:var(--font-mono)}
+.bill .t{display:flex;justify-content:space-between;font-size:21px;font-weight:700;border-top:1px dashed color-mix(in srgb,var(--paper) 35%,transparent);margin-top:10px;padding-top:12px;color:var(--paper);font-family:var(--font-mono)}
+.btn{width:100%;margin-top:14px;padding:13px;border:0;border-radius:8px;background:var(--brand);color:var(--brand-ink);font-weight:700;font-size:15px;cursor:pointer;font-family:"Plus Jakarta Sans",sans-serif;transition:filter .15s ease,transform .1s ease}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:translateY(1px)}
+.btn.alt{background:var(--accent)}
+.btn.line{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.note{padding:11px 13px;border-radius:8px;font-size:13.5px;font-weight:600;margin-top:12px}
+.ok{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+.bad{background:color-mix(in srgb,var(--danger) 14%,transparent);color:var(--danger)}
+.info{background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line);font-weight:500}
+.hide{display:none!important}
+.steps{display:flex;gap:6px;margin-bottom:16px}
+.steps div{flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--ink-2);padding:8px 4px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);font-family:var(--font-mono)}
+.steps div.act{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.steps div.done{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
+.otp{letter-spacing:.5em;text-align:center;font-size:22px;font-weight:700;font-family:var(--font-mono)}
+.rate-row{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line)}
+.rate-row input{text-align:right;font-family:var(--font-mono)}
+.rate-row span{font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+td.mono, td:has(> .mono){font-family:var(--font-mono)}
+th{color:var(--ink-2);font-size:12px}
+.scroll{overflow-x:auto}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink-2)}
+.pill.g{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.pill.y{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,var(--line))}
+
+/* Promo: a rotated rubber-stamp badge rather than a generic gradient banner */
+.promo{display:none;align-items:center;gap:14px;background:var(--panel);border:3px solid var(--brand);border-radius:10px;padding:14px 16px;margin-bottom:16px}
+.promo.on{display:flex}
+.promo .big{font-size:21px;font-weight:800;font-family:var(--font-mono);line-height:1;color:var(--brand);border:2px solid var(--brand);border-radius:50%;width:60px;height:60px;display:grid;place-items:center;flex:none;transform:rotate(-8deg)}
+.promo small{color:var(--ink-2)}
+.promo b{color:var(--ink)}
+
+.qrbox{text-align:center;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:12px}
+.qrbox img{max-width:230px;width:100%;border-radius:8px;background:#fff;padding:8px}
+.pay-amt{font-size:26px;font-weight:800;font-family:var(--font-mono);margin:6px 0}
+.custom-row{display:grid;grid-template-columns:1fr 110px 40px;gap:8px;align-items:center;margin-top:8px}
+footer{border-top:2px dashed var(--line);padding:18px 0;color:var(--ink-2);font-size:13px;text-align:center}
+a{color:var(--brand)}
+@media(max-width:760px){
+  .tiles{grid-template-columns:1fr 1fr}
+  .row,.row3{grid-template-columns:1fr}
+  .hero h1{font-size:25px}
+}
+@media(max-width:420px){.tiles{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <div class="brand" onclick="go('home')"><div class="logo">🖨</div> PrintCampus</div>
+    <div class="bar-actions">
+      <button class="ghost" onclick="toggleTheme()" id="themeBtn">🌗</button>
+      <button class="ghost" onclick="go('order')">Order Now</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ HOME ============ -->
+  <section id="p-home" class="page on">
+    <div id="promo" class="promo">
+      <div class="big" id="promoPct">15%</div>
+      <div><b>OFF on total bill</b><br><small id="promoText">Limited time offer — discount automatically apply hoga.</small></div>
+    </div>
+    <div class="hero">
+      <h1>Campus printing, ordered online.</h1>
+      <p>PDF ya photo upload karo, options choose karo, 2-step verification ke baad order shop tak.</p>
+    </div>
+    <div class="tiles">
+      <button class="tile" onclick="go('order')"><div class="ic">📤</div><b>New Order</b><span>PDF / photo upload karke print order banao</span></button>
+      <button class="tile" onclick="go('verify')"><div class="ic">🔐</div><b>Verify Order</b><span>2-step verification poora karo</span></button>
+      <button class="tile" onclick="go('track')"><div class="ic">📦</div><b>My Orders</b><span>Apne order ka status dekho</span></button>
+      <button class="tile" onclick="go('rates')"><div class="ic">💰</div><b>Rate Card</b><span>Shop ke current printing rates</span></button>
+      <button class="tile" onclick="go('help')"><div class="ic">💬</div><b>Help & Contact</b><span>Shop timing, location, WhatsApp</span></button>
+      <button class="tile" onclick="go('owner')"><div class="ic">🛡️</div><b>Owner Panel</b><span>Private — sirf shop owner ke liye</span></button>
+    </div>
+  </section>
+
+  <!-- ============ ORDER ============ -->
+  <section id="p-order" class="page">
+    <button class="back" onclick="go('home')">← Home</button>
+    <div class="steps">
+      <div id="s1" class="act">1 · Files</div>
+      <div id="s2">2 · Options</div>
+      <div id="s3">3 · Verify</div>
+      <div id="s4">4 · Pay 50%</div>
+    </div>
+
+    <div class="card">
+      <h2>Files upload karo</h2>
+      <p class="sub">PDF, JPG, PNG, WEBP — ek saath multiple files chalengi. PDF ke pages automatic count ho jaate hain.</p>
+      <label class="drop" id="drop">
+        <input id="fileInput" type="file" accept="application/pdf,image/*" multiple />
+        <b>Click karo ya files yahan drag karo</b>
+        <small>PDF · JPG · PNG · WEBP (max 25 MB per file)</small>
+      </label>
+      <div id="fileList" class="files"></div>
+      <div id="fileNote"></div>
+    </div>
+
+    <div class="card">
+      <h2>Print options</h2>
+      <p class="sub">Har change par total turant update hota hai.</p>
+      <div class="row">
+        <div><label>Print type</label>
+          <select id="printType"><option value="bw">Black & White</option><option value="color">Colour</option></select>
+        </div>
+        <div><label>Sides</label>
+          <select id="sides"><option value="single">Single side</option><option value="double">Double side (back-to-back)</option></select>
+        </div>
+      </div>
+      <div class="row3">
+        <div><label>Paper</label><select id="paper"><option value="A4">A4</option><option value="A3">A3</option></select></div>
+        <div><label>Pages per sheet</label><select id="layout"><option value="1">1</option><option value="2">2</option><option value="4">4</option></select></div>
+        <div><label>Copies</label><input id="copies" type="number" min="1" value="1" /></div>
+      </div>
+      <div class="row">
+        <div><label>Binding</label>
+          <select id="binding"><option value="none">None</option><option value="staple">Staple</option><option value="spiral">Spiral</option></select>
+        </div>
+        <div><label>Page range (optional)</label><input id="pages" type="text" placeholder="e.g. 1-5,8,10-12 — khaali = all pages" /></div>
+      </div>
+      <div class="row">
+        <div><label>Your name</label><input id="studentName" type="text" placeholder="Full name" /></div>
+        <div><label>WhatsApp number</label><input id="phone" type="tel" inputmode="numeric" maxlength="10" placeholder="10 digit number" /></div>
+      </div>
+      <div id="extrasWrap"></div>
+
+      <label>Pickup / delivery note (optional)</label>
+      <input id="notes" type="text" placeholder="e.g. 5 baje pickup, urgent" />
+
+      <div class="bill">
+        <div class="l"><span>Printable pages</span><span id="bPages">0</span></div>
+        <div class="l"><span>Sheets used</span><span id="bSheets">0</span></div>
+        <div class="l"><span>Printing charge</span><span id="bPrint">₹0.00</span></div>
+        <div class="l"><span>Binding</span><span id="bBind">₹0.00</span></div>
+        <div class="l hide" id="bDiscRow" style="color:#7ef0c8"><span id="bDiscLabel">Discount</span><span id="bDisc">−₹0.00</span></div>
+        <div class="t"><span>Total</span><span id="bTotal">₹0.00</span></div>
+        <div class="l" style="margin-top:8px"><span>Pay now (50% advance)</span><span id="bAdv">₹0.00</span></div>
+      </div>
+
+      <button class="btn" onclick="startVerification()">Continue to verification →</button>
+      <div id="orderMsg"></div>
+    </div>
+  </section>
+
+  <!-- ============ VERIFY ============ -->
+  <section id="p-verify" class="page">
+    <button class="back" onclick="go('order')">← Order details</button>
+    <div class="card">
+      <h2>2-Step verification</h2>
+      <p class="sub">Dono steps clear hone ke baad hi order confirm hoga. Isse fake / galti wale orders shop tak nahi jaate.</p>
+
+      <div id="vSummary" class="note info"></div>
+
+      <!-- step A -->
+      <div id="stepA">
+        <label>Step 1 — 6 digit OTP</label>
+        <input id="otpInput" class="otp" maxlength="6" inputmode="numeric" placeholder="······" />
+        <div id="demoOtp" class="note info"></div>
+        <button class="btn" onclick="checkOtp()">Verify OTP</button>
+        <button class="btn line" onclick="resendOtp()">Resend OTP</button>
+      </div>
+
+      <!-- step B -->
+      <div id="stepB" class="hide">
+        <div class="note ok">Step 1 cleared ✓</div>
+        <label>Step 2 — apne WhatsApp number ke last 4 digits</label>
+        <input id="pinInput" class="otp" maxlength="4" inputmode="numeric" placeholder="····" />
+        <label style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink);margin-top:14px">
+          <input type="checkbox" id="agree" style="width:auto;margin-right:8px" />
+          Maine details check kar li hain, print hone ke baad order cancel nahi hoga.
+        </label>
+        <button class="btn alt" onclick="goToPayment()">Continue to payment →</button>
+      </div>
+
+      <!-- step payment -->
+      <div id="stepPay" class="hide">
+        <div class="note ok">Step 1 & 2 cleared ✓</div>
+        <div class="qrbox">
+          <div class="pill">Advance payment</div>
+          <div class="pay-amt" id="payAmount">₹0.00</div>
+          <div class="sub" id="paySplit"></div>
+          <img id="payQr" alt="Payment QR" />
+          <div id="payUpi" class="sub"></div>
+          <div id="noQr" class="note info hide">Shop ne abhi QR upload nahi kiya — WhatsApp par shop se payment detail maang lo.</div>
+        </div>
+        <label>Payment reference / UTR / transaction ID</label>
+        <input id="utr" maxlength="24" placeholder="e.g. 4318XXXXXX82" />
+        <button class="btn alt" onclick="finalConfirm()">Payment done — confirm order</button>
+        <p class="sub" style="margin-top:10px">Baaki 50% amount pickup ke time dena hoga.</p>
+      </div>
+
+      <div id="stepC" class="hide">
+        <div class="note ok">Order CONFIRMED ✓</div>
+        <div id="finalBox" class="note info"></div>
+        <a id="waLink" class="btn" style="display:block;text-align:center;text-decoration:none" target="_blank" rel="noopener">📲 Send order to shop on WhatsApp</a>
+        <button class="btn line" onclick="go('track')">My orders dekho</button>
+      </div>
+
+      <div id="verifyMsg"></div>
+    </div>
+  </section>
+
+  <!-- ============ TRACK ============ -->
+  <section id="p-track" class="page">
+    <button class="back" onclick="go('home')">← Home</button>
+    <div class="card">
+      <h2>My orders</h2>
+      <p class="sub">Isi device se banaye gaye orders.</p>
+      <div class="scroll"><table id="myOrders"></table></div>
+      <button class="btn line" onclick="renderMyOrders()">Refresh</button>
+    </div>
+  </section>
+
+  <!-- ============ RATES ============ -->
+  <section id="p-rates" class="page">
+    <button class="back" onclick="go('home')">← Home</button>
+    <div class="card">
+      <h2>Rate card</h2>
+      <p class="sub">Ye rates shop owner set karta hai — change hote hi yahan update ho jaate hain.</p>
+      <div class="scroll"><table id="rateTable"></table></div>
+      <p class="sub" id="rateSync"></p>
+    </div>
+  </section>
+
+  <!-- ============ HELP ============ -->
+  <section id="p-help" class="page">
+    <button class="back" onclick="go('home')">← Home</button>
+    <div class="card">
+      <h2>Help & contact</h2>
+      <p class="sub">Koi bhi doubt ho to seedha WhatsApp par message karo.</p>
+      <table>
+        <tr><th>Shop WhatsApp</th><td>+91 83186 40642</td></tr>
+        <tr><th>Timing</th><td>9:00 AM – 9:00 PM (Mon–Sat)</td></tr>
+        <tr><th>Accepted files</th><td>PDF, JPG, PNG, WEBP</td></tr>
+        <tr><th>Payment</th><td>Pickup ke time cash / UPI</td></tr>
+      </table>
+      <a class="btn" style="display:block;text-align:center;text-decoration:none" target="_blank" rel="noopener"
+         href="https://wa.me/918318640642?text=Hi%20PrintCampus%2C%20mujhe%20printing%20ke%20baare%20me%20puchna%20hai.">📲 Chat on WhatsApp</a>
+    </div>
+    <div class="card">
+      <h2>Order kaise kaam karta hai</h2>
+      <table>
+        <tr><th>1</th><td>File upload → pages auto count</td></tr>
+        <tr><th>2</th><td>Options choose → live total</td></tr>
+        <tr><th>3</th><td>OTP verification (step 1)</td></tr>
+        <tr><th>4</th><td>Number confirm + agreement (step 2)</td></tr>
+        <tr><th>5</th><td>Order confirm → shop ko WhatsApp par details</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ OWNER ============ -->
+  <section id="p-owner" class="page">
+    <button class="back" onclick="go('home')">← Home</button>
+
+    <div id="ownerLock" class="card">
+      <h2>Owner panel</h2>
+      <p class="sub">Ye block sirf shop owner ke liye hai.</p>
+      <div id="ownerWho" class="note info">Access check ho raha hai…</div>
+      <div id="pinWrap" class="hide">
+        <div id="emailSetup">
+          <p class="note info">Ye owner ki email pehli aur aakhri baar set ho rahi hai — save karne ke baad safety ke liye dobara change nahi hogi.</p>
+          <label>Owner Email (one-time)</label>
+          <input id="setupEmail" type="email" placeholder="owner@example.com" value="abhishekthakur6464@gmail.com" />
+          <button class="btn" onclick="saveOwnerEmail()">Save email (locks permanently)</button>
+        </div>
+        <div id="loginForm" class="hide">
+          <label>Email</label>
+          <input id="ownerEmail" type="email" placeholder="owner@example.com" autocomplete="username" />
+          <label>Password</label>
+          <input id="ownerPin" type="password" placeholder="Password" autocomplete="current-password" />
+          <button class="btn" onclick="unlockOwner()">Login</button>
+        </div>
+      </div>
+      <div id="lockMsg"></div>
+    </div>
+
+    <div id="ownerBody" class="hide">
+      <div class="card">
+        <h2>Rate control</h2>
+        <p class="sub">Yahan se rate change karte hi students ko naya total dikhega.</p>
+        <div id="rateInputs"></div>
+        <h3 style="margin:18px 0 0">Extra services (apni marzi se)</h3>
+        <p class="sub">Koi bhi naya item aur uska rate add karo — lamination, hard binding, urgent charge, kuch bhi.</p>
+        <div id="customRates"></div>
+        <button class="btn line" onclick="addCustomRate()">+ Add item</button>
+        <button class="btn" onclick="saveRates()">Save rates</button>
+        <button class="btn line" onclick="resetRates()">Reset to default</button>
+        <div id="rateMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2>Discount offer</h2>
+        <p class="sub">Enable karte hi home page par offer banner dikhega aur har bill par discount lagega. Band karte hi gayab.</p>
+        <label style="text-transform:none;letter-spacing:0;font-weight:600;color:var(--ink)">
+          <input type="checkbox" id="discOn" style="width:auto;margin-right:8px" /> Discount offer ON karo
+        </label>
+        <div class="row">
+          <div><label>Discount %</label><input id="discPct" type="number" min="0" max="100" step="1" /></div>
+          <div><label>Banner text</label><input id="discText" type="text" placeholder="Limited time offer" /></div>
+        </div>
+        <button class="btn" onclick="saveShop()">Save offer</button>
+        <div id="discMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2>OTP Codes Pool</h2>
+        <p class="sub">Bulk me 6-digit codes daalo (file upload ya paste) — student verify karte waqt server inme se random ek code uthakar WhatsApp/SMS se bhejega. Har code sirf ek baar use hota hai.</p>
+        <div id="poolStatus" class="note info">Load ho raha hai…</div>
+        <label class="drop" style="padding:16px">
+          <input id="poolFile" type="file" accept=".txt,.csv,text/plain,text/csv" />
+          <b>.txt / .csv file upload karo</b><small>Ek code per line ya comma se alag</small>
+        </label>
+        <label>Ya seedha paste karo (ek code per line)</label>
+        <textarea id="poolPaste" rows="4" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--ink);font:inherit;font-family:var(--font-mono)" placeholder="111111&#10;222222&#10;333333"></textarea>
+        <button class="btn" onclick="uploadPoolText()">Paste se add karo</button>
+        <button class="btn line" onclick="clearPool()">Pool poora khaali karo</button>
+        <div id="poolMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2>Payment QR</h2>
+        <p class="sub">Apna UPI / payment QR yahan upload karo — student ko payment step par yahi dikhega.</p>
+        <label class="drop" style="padding:16px">
+          <input id="qrInput" type="file" accept="image/*" />
+          <b>QR image upload karo</b><small>JPG / PNG</small>
+        </label>
+        <div class="qrbox"><img id="qrPreview" alt="QR preview" /><div id="qrEmpty" class="sub">Abhi koi QR nahi.</div></div>
+        <label>UPI ID (optional, QR ke saath dikhega)</label>
+        <input id="upiId" type="text" placeholder="name@upi" />
+        <label>Advance %</label>
+        <input id="advPct" type="number" min="0" max="100" step="5" />
+        <button class="btn" onclick="saveShop()">Save payment settings</button>
+        <button class="btn line" onclick="removeQr()">Remove QR</button>
+        <div id="qrMsg"></div>
+      </div>
+      <div class="card">
+        <h2>Incoming orders</h2>
+        <p class="sub">Confirmed orders ki list.</p>
+        <div class="scroll"><table id="allOrders"></table></div>
+        <button class="btn line" onclick="renderAllOrders()">Refresh</button>
+      </div>
+      <div class="card">
+        <h2>Shop settings</h2>
+        <p class="sub">WhatsApp number aur owner login <code>.env</code> file se set hote hain (security ke liye backend side).</p>
+        <table>
+          <tr><th>Owner email</th><td id="ownerEmailView">—</td></tr>
+          <tr><th>Shop WhatsApp</th><td id="shopPhoneView">—</td></tr>
+          <tr><th>OTP provider</th><td id="otpProviderView">—</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap">PrintCampus · Student printing system · WhatsApp +91 83186 40642</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+/* =====================================================================
+   PrintCampus frontend — backend se connected (localhost:4000/api)
+   OTP, price aur owner login ab yahan calculate/generate NAHI hote —
+   sirf server se maangi jaati hai. Deploy karte waqt neeche API_BASE
+   apne backend ke asli URL se badal do (e.g. https://api.tumhaari-site.com/api).
+   ===================================================================== */
+const API_BASE = "http://localhost:4000/api";
+
+let rates = {}, extras = [], shop = {}, config = null;
+let selectedFiles = [];      // {file, name, size, kind, pages, url}
+let uploadedFiles = [];      // server se mile {id,name,size,kind}
+let order = null;
+let phoneForOtp = "";
+let verifyToken = null;
+let otpTries = 0, stepA = false, stepB = false;
+let ownerToken = sessionStorage.getItem("pc_owner_token") || null;
+
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+
+/* ---------------- tiny fetch helper ---------------- */
+async function api(path, opts = {}) {
+  const headers = opts.body instanceof FormData
+    ? { ...(opts.headers || {}) }
+    : { "Content-Type": "application/json", ...(opts.headers || {}) };
+  let res;
+  try {
+    res = await fetch(API_BASE + path, { ...opts, headers });
+  } catch (e) {
+    throw new Error("Server tak pahunch nahi paaye. Backend chal raha hai ya nahi check karo.");
+  }
+  let data = {};
+  try { data = await res.json(); } catch {}
+  if (!res.ok) throw new Error(data.error || ("Request fail hui (" + res.status + ")"));
+  return data;
+}
+
+/* ---------------- local ui prefs (theme only — no business data here) ---------------- */
+function lsGet(k, f) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; } catch { return f; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+/* ---------------- navigation ---------------- */
+function go(id) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("on"));
+  const el = document.getElementById("p-" + id);
+  if (el) el.classList.add("on");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (id === "rates") renderRateCard();
+  if (id === "track") renderMyOrders();
+  if (id === "owner") openOwner();
+  if (location.hash !== "#" + id) history.replaceState(null, "", "#" + id);
+}
+window.addEventListener("hashchange", () => go((location.hash || "#home").slice(1)));
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  lsSet("pc_theme", next);
+}
+(function () { const t = lsGet("pc_theme", null); if (t) document.documentElement.setAttribute("data-theme", t); })();
+
+/* ---------------- load config (rates/extras/offer/qr) from server ---------------- */
+async function loadConfig() {
+  try {
+    config = await api("/orders/config");
+    rates = config.rates; extras = config.extras; shop = config.shop;
+    renderPromo(); renderExtras(); renderRateCard();
+    document.getElementById("otpProviderView") && (document.getElementById("otpProviderView").textContent = "server-configured");
+    quote();
+  } catch (e) {
+    msg("fileNote", "Rates load nahi ho payi: " + e.message, "bad");
+  }
+}
+function renderPromo() {
+  const p = document.getElementById("promo");
+  const on = !!(shop && shop.discountOn && Number(shop.discountPct) > 0);
+  p.classList.toggle("on", on);
+  if (on) {
+    document.getElementById("promoPct").textContent = Number(shop.discountPct) + "%";
+    document.getElementById("promoText").textContent = shop.discountText || "Offer live hai.";
+  }
+}
+function renderExtras() {
+  const w = document.getElementById("extrasWrap");
+  if (!extras.length) { w.innerHTML = ""; return; }
+  w.innerHTML = `<label>Extra services</label>` + extras.map((e, i) =>
+    `<label style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink);margin:6px 0">
+      <input type="checkbox" id="ex_${i}" style="width:auto;margin-right:8px" onchange="quote()">
+      ${esc(e.name)} — ${money(e.price)}</label>`).join("");
+}
+function renderRateCard() {
+  if (!rates || !Object.keys(rates).length) { document.getElementById("rateTable").innerHTML = ""; return; }
+  const LABELS = {
+    bwSingle: "B&W — single side (per sheet)", bwDouble: "B&W — double side (per sheet)",
+    colorSingle: "Colour — single side (per sheet)", colorDouble: "Colour — double side (per sheet)",
+    a3Extra: "A3 extra (per page)", photo: "Photo print (per image)",
+    staple: "Staple (per copy)", spiral: "Spiral binding (per copy)", minOrder: "Minimum order amount"
+  };
+  let rows = Object.keys(LABELS).map(k => `<tr><td>${LABELS[k]}</td><td>${money(rates[k])}</td></tr>`).join("");
+  rows += extras.map(e => `<tr><td>${esc(e.name)} <span class="pill">extra</span></td><td>${money(e.price)}</td></tr>`).join("");
+  if (shop.discountOn && Number(shop.discountPct) > 0)
+    rows += `<tr><td><b>Running offer</b></td><td><span class="pill g">${shop.discountPct}% OFF</span></td></tr>`;
+  rows += `<tr><td>Advance at confirmation</td><td>${shop.advancePct}% of total</td></tr>`;
+  document.getElementById("rateTable").innerHTML = "<tr><th>Item</th><th>Rate</th></tr>" + rows;
+  const s = document.getElementById("rateSync"); if (s) s.textContent = "Live rates server se sync hain.";
+}
+
+/* ---------------- files ---------------- */
+const drop = document.getElementById("drop"), fileInput = document.getElementById("fileInput");
+["dragenter", "dragover"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("dragover"); }));
+["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("dragover"); }));
+drop.addEventListener("drop", ev => addFiles(ev.dataTransfer.files));
+fileInput.addEventListener("change", function () { addFiles(this.files); this.value = ""; });
+
+async function addFiles(list) {
+  for (const f of list) {
+    const isPdf = f.type === "application/pdf";
+    const isImg = f.type.startsWith("image/");
+    if (!isPdf && !isImg) { msg("fileNote", "Sirf PDF ya image files allowed hain: " + f.name, "bad"); continue; }
+    if (f.size > 25 * 1024 * 1024) { msg("fileNote", f.name + " 25 MB se badi hai.", "bad"); continue; }
+    const item = { file: f, name: f.name, size: f.size, kind: isPdf ? "pdf" : "image", pages: 1, url: isImg ? URL.createObjectURL(f) : null };
+    if (isPdf) item.pages = await countPdfPages(f);
+    selectedFiles.push(item); renderFiles(); quote();
+  }
+  msg("fileNote", "");
+}
+async function countPdfPages(file) {
+  try {
+    if (!window.pdfjsLib) return 1;
+    const buf = await file.arrayBuffer();
+    const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+    return doc.numPages;
+  } catch { msg("fileNote", "PDF page count nahi mila, page range manually daal do.", "bad"); return 1; }
+}
+function renderFiles() {
+  const box = document.getElementById("fileList");
+  box.innerHTML = selectedFiles.map((f, i) => `
+    <div class="file">
+      ${f.url ? `<img src="${f.url}" alt="">` : `<div class="ph">📄</div>`}
+      <div class="meta"><b>${esc(f.name)}</b>
+        <small>${f.kind === "pdf" ? f.pages + " pages" : "image"} · ${(f.size / 1024 / 1024).toFixed(2)} MB</small></div>
+      <button class="x" onclick="removeFile(${i})">✕</button>
+    </div>`).join("");
+}
+function removeFile(i) { selectedFiles.splice(i, 1); renderFiles(); quote(); }
+function esc(s) { return String(s).replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c])); }
+function money(n) { return "₹" + Number(n || 0).toFixed(2); }
+function v(id) { return document.getElementById(id).value; }
+function set(id, t) { const e = document.getElementById(id); if (e) e.textContent = t; }
+function msg(id, text, type) {
+  const e = document.getElementById(id); if (!e) return;
+  e.className = text ? "note " + (type === "bad" ? "bad" : type === "ok" ? "ok" : "info") : "";
+  e.textContent = text || "";
+}
+function checkedExtraNames() {
+  return extras.filter((e, i) => document.getElementById("ex_" + i)?.checked).map(e => e.name);
+}
+
+/* ---------------- live price (server calculated) ---------------- */
+let quoteTimer = null;
+function quote() {
+  clearTimeout(quoteTimer);
+  quoteTimer = setTimeout(async () => {
+    const pdfPages = selectedFiles.filter(f => f.kind === "pdf").reduce((s, f) => s + f.pages, 0);
+    const images = selectedFiles.filter(f => f.kind === "image").length;
+    const body = {
+      pdfPages, images, copies: Number(v("copies")) || 1,
+      printType: v("printType"), sides: v("sides"), paper: v("paper"),
+      layout: Number(v("layout")), binding: v("binding"), range: v("pages"),
+      extras: checkedExtraNames()
+    };
+    try {
+      const p = await api("/orders/quote", { method: "POST", body: JSON.stringify(body) });
+      set("bPages", p.docPages + p.images);
+      set("bSheets", p.sheets * p.copies + p.images * p.copies);
+      set("bPrint", money(p.printing));
+      set("bBind", money(p.addons));
+      set("bDisc", "−" + money(p.discount));
+      set("bDiscLabel", "Discount (" + p.discountPct + "% off)");
+      document.getElementById("bDiscRow").classList.toggle("hide", !(p.discountPct > 0));
+      set("bTotal", money(p.total));
+      set("bAdv", money(p.advance));
+      window._lastQuote = p;
+    } catch (e) { msg("orderMsg", e.message, "bad"); }
+  }, 250);
+}
+["pages", "copies", "printType", "sides", "paper", "layout", "binding"].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener("input", quote); el.addEventListener("change", quote);
+});
+
+/* ---------------- step 1: start verification (upload files + send OTP) ---------------- */
+async function startVerification() {
+  const name = v("studentName").trim(), phone = v("phone").trim();
+  if (!selectedFiles.length) return msg("orderMsg", "Pehle koi PDF ya photo upload karo.", "bad");
+  if (name.length < 2) return msg("orderMsg", "Apna naam likho.", "bad");
+  if (!/^[6-9]\d{9}$/.test(phone)) return msg("orderMsg", "Sahi 10-digit WhatsApp number daalo.", "bad");
+  if (!window._lastQuote || window._lastQuote.total <= 0) return msg("orderMsg", "Kam se kam ek printable page chahiye.", "bad");
+
+  phoneForOtp = "91" + phone;
+  stepA = false; stepB = false; otpTries = 0; verifyToken = null;
+  document.getElementById("stepA").classList.remove("hide");
+  document.getElementById("stepB").classList.add("hide");
+  document.getElementById("stepPay").classList.add("hide");
+  document.getElementById("stepC").classList.add("hide");
+  document.getElementById("otpInput").value = "";
+  document.getElementById("pinInput").value = "";
+  document.getElementById("agree").checked = false;
+  document.getElementById("utr").value = "";
+  msg("verifyMsg", "");
+
+  document.getElementById("vSummary").textContent =
+    `${name} · ${selectedFiles.length} file(s) · Total ${money(window._lastQuote.total)} · OTP bhej rahe hain…`;
+  mark(3);
+  go("verify");
+  await sendOtp();
+}
+async function sendOtp() {
+  try {
+    const r = await api("/otp/send", { method: "POST", body: JSON.stringify({ phone: phoneForOtp }) });
+    if (r.derived) {
+      const last6 = phoneForOtp.slice(-6);
+      msg("demoOtp",
+        "Verification abhi WhatsApp/SMS se nahi jaata (setup pending hai). Tumhara code hai: " + last6 +
+        " — apne hi number ke last 6 digits.",
+        "info");
+    } else {
+      msg("demoOtp", r.devCode
+        ? "DEV MODE OTP: " + r.devCode + " (production me ye WhatsApp/SMS par jaata hai, screen par nahi dikhta)"
+        : "OTP tumhare WhatsApp/SMS par bhej diya gaya hai.", "info");
+    }
+  } catch (e) { msg("verifyMsg", e.message, "bad"); }
+}
+async function resendOtp() {
+  otpTries = 0;
+  try { await sendOtp(); msg("verifyMsg", "Naya OTP bhej diya gaya.", "ok"); }
+  catch (e) { msg("verifyMsg", e.message, "bad"); }
+}
+async function checkOtp() {
+  try {
+    const r = await api("/otp/verify", {
+      method: "POST",
+      body: JSON.stringify({ phone: phoneForOtp, code: v("otpInput").trim() })
+    });
+    verifyToken = r.verifyToken;
+    stepA = true;
+    document.getElementById("stepA").classList.add("hide");
+    document.getElementById("stepB").classList.remove("hide");
+    msg("verifyMsg", "Step 1 done. Ab step 2 poora karo.", "ok");
+  } catch (e) { msg("verifyMsg", e.message, "bad"); }
+}
+
+/* ---------------- step 2: local confirm check + move to payment ---------------- */
+function goToPayment() {
+  if (!stepA || !verifyToken) return msg("verifyMsg", "Pehle OTP verify karo.", "bad");
+  const pin = v("pinInput").trim();
+  if (pin !== phoneForOtp.slice(-4)) return msg("verifyMsg", "Last 4 digits match nahi hue.", "bad");
+  if (!document.getElementById("agree").checked) return msg("verifyMsg", "Confirmation checkbox tick karo.", "bad");
+  stepB = true;
+  document.getElementById("stepB").classList.add("hide");
+  document.getElementById("stepPay").classList.remove("hide");
+  const adv = window._lastQuote?.advance || 0, total = window._lastQuote?.total || 0;
+  document.getElementById("payAmount").textContent = money(adv);
+  document.getElementById("paySplit").textContent =
+    `${shop.advancePct}% abhi · baaki ${money(total - adv)} pickup par · total ${money(total)}`;
+  const img = document.getElementById("payQr");
+  const qrUrl = shop.qrUrl ? (API_BASE.replace(/\/api$/, "") + shop.qrUrl) : "";
+  if (qrUrl) { img.src = qrUrl; img.style.display = "inline-block"; document.getElementById("noQr").classList.add("hide"); }
+  else { img.removeAttribute("src"); img.style.display = "none"; document.getElementById("noQr").classList.remove("hide"); }
+  document.getElementById("payUpi").textContent = shop.upi ? "UPI ID: " + shop.upi : "";
+  msg("verifyMsg", "Step 2 done. Ab advance payment karo.", "ok");
+  mark(4);
+}
+
+/* ---------------- upload files, create order, submit payment ---------------- */
+async function uploadSelectedFiles() {
+  const fd = new FormData();
+  selectedFiles.forEach(f => fd.append("files", f.file));
+  const r = await fetch(API_BASE + "/files", {
+    method: "POST",
+    headers: { "x-verify-token": verifyToken },
+    body: fd
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || "File upload fail hua.");
+  uploadedFiles = data.files;
+}
+async function createOrder() {
+  const body = {
+    verifyToken, name: v("studentName").trim(), notes: v("notes").trim(),
+    files: uploadedFiles,
+    pdfPages: selectedFiles.filter(f => f.kind === "pdf").reduce((s, f) => s + f.pages, 0),
+    images: selectedFiles.filter(f => f.kind === "image").length,
+    copies: Number(v("copies")) || 1, printType: v("printType"), sides: v("sides"),
+    paper: v("paper"), layout: Number(v("layout")), binding: v("binding"),
+    range: v("pages"), extras: checkedExtraNames()
+  };
+  const r = await api("/orders", { method: "POST", body: JSON.stringify(body) });
+  order = r.order;
+}
+async function finalConfirm() {
+  if (!stepA || !stepB || !verifyToken) return msg("verifyMsg", "Pehle verification poori karo.", "bad");
+  const utr = v("utr").trim();
+  if (utr.length < 6) return msg("verifyMsg", "Payment ke baad UTR / transaction ID daalo (kam se kam 6 digit).", "bad");
+
+  try {
+    msg("verifyMsg", "Order submit ho raha hai…", "info");
+    if (!order) { await uploadSelectedFiles(); await createOrder(); }
+    const r = await api(`/orders/${order.id}/payment`, {
+      method: "POST", body: JSON.stringify({ verifyToken, utr })
+    });
+    order = r.order;
+
+    const mine = lsGet("pc_orders", []);
+    mine.unshift({ id: order.id, files: order.files, total: order.price.total, status: order.status });
+    lsSet("pc_orders", mine.slice(0, 30));
+
+    document.getElementById("stepPay").classList.add("hide");
+    document.getElementById("stepC").classList.remove("hide");
+    document.getElementById("finalBox").innerHTML =
+      `<b>Order ID:</b> <span class="mono">${order.id}</span><br><b>Name:</b> ${esc(order.name)}<br>
+       <b>Files:</b> ${order.files.map(f => esc(f.name)).join(", ")}<br>
+       ${order.price.discount > 0 ? `<b>Discount:</b> ${order.price.discountPct}% (−${money(order.price.discount)})<br>` : ""}
+       <b>Total:</b> ${money(order.price.total)}<br>
+       <b>Paid now:</b> ${money(order.price.advance)} (UTR ${esc(utr)})<br>
+       <b>Balance at pickup:</b> ${money(order.price.balance)}<br>
+       <b>Status:</b> Shop ko notification apne aap chali gayi hai.`;
+    document.getElementById("waLink").href =
+      "https://wa.me/918318640642?text=" + encodeURIComponent(`PrintCampus order ${order.id} confirm ho gaya hai, kripya check kar lein.`);
+    msg("verifyMsg", "Order confirm ho gaya ✓", "ok");
+  } catch (e) { msg("verifyMsg", e.message, "bad"); }
+}
+function mark(step) {
+  [1, 2, 3, 4].forEach(i => {
+    const el = document.getElementById("s" + i);
+    if (el) el.className = i < step ? "done" : i === step ? "act" : "";
+  });
+}
+
+/* ---------------- my orders (local list + server status) ---------------- */
+function renderMyOrders() {
+  const list = lsGet("pc_orders", []);
+  const t = document.getElementById("myOrders");
+  if (!list.length) { t.innerHTML = "<tr><td>Abhi tak koi order nahi.</td></tr>"; return; }
+  t.innerHTML = "<tr><th>ID</th><th>Files</th><th>Total</th><th>Status</th></tr>" +
+    list.map(o => `<tr><td class="mono">${o.id}</td><td>${esc((o.files || []).map(f => f.name).join(", ")).slice(0, 40)}</td>
+      <td>${money(o.total)}</td><td><span class="pill ${/CONFIRM/.test(o.status) ? "g" : "y"}">${o.status}</span></td></tr>`).join("");
+}
+
+/* ---------------- owner panel (one-time email lock + JWT login) ---------------- */
+async function openOwner() {
+  const who = document.getElementById("ownerWho");
+  if (ownerToken) {
+    try {
+      const me = await api("/admin/me", { headers: { Authorization: "Bearer " + ownerToken } });
+      who.textContent = "Logged in as " + me.owner + " ✓"; who.className = "note ok";
+      return showOwner();
+    } catch { ownerToken = null; sessionStorage.removeItem("pc_owner_token"); }
+  }
+  document.getElementById("pinWrap").classList.remove("hide");
+  try {
+    const status = await api("/admin/owner-status");
+    if (status.emailSet) {
+      who.textContent = "Ye panel owner ke liye locked hai. Login karo.";
+      who.className = "note info";
+      document.getElementById("emailSetup").classList.add("hide");
+      document.getElementById("loginForm").classList.remove("hide");
+    } else {
+      who.textContent = "Pehli baar setup — apni owner email save karo (ye sirf ek baar hoga).";
+      who.className = "note info";
+      document.getElementById("emailSetup").classList.remove("hide");
+      document.getElementById("loginForm").classList.add("hide");
+    }
+  } catch (e) { who.textContent = e.message; who.className = "note bad"; }
+}
+async function saveOwnerEmail() {
+  try {
+    const email = v("setupEmail").trim();
+    const r = await api("/admin/setup-email", { method: "POST", body: JSON.stringify({ email }) });
+    msg("lockMsg", "Email save ho gayi (" + r.email + "). Ab isi email se login karo.", "ok");
+    document.getElementById("emailSetup").classList.add("hide");
+    document.getElementById("loginForm").classList.remove("hide");
+    document.getElementById("ownerEmail").value = r.email;
+  } catch (e) { msg("lockMsg", e.message, "bad"); }
+}
+async function unlockOwner() {
+  try {
+    const r = await api("/admin/login", {
+      method: "POST",
+      body: JSON.stringify({ email: v("ownerEmail").trim(), password: v("ownerPin") })
+    });
+    ownerToken = r.token;
+    sessionStorage.setItem("pc_owner_token", ownerToken);   // session ke liye — tab band karte hi expire
+    msg("lockMsg", "Login ho gaya ✓", "ok");
+    document.getElementById("pinWrap").classList.add("hide");
+    showOwner();
+  } catch (e) { msg("lockMsg", e.message, "bad"); }
+}
+function authHeader() { return { Authorization: "Bearer " + ownerToken }; }
+function showOwner() {
+  document.getElementById("ownerBody").classList.remove("hide");
+  document.getElementById("pinWrap").classList.add("hide");
+  const LABELS = {
+    bwSingle: "B&W — single side (per sheet)", bwDouble: "B&W — double side (per sheet)",
+    colorSingle: "Colour — single side (per sheet)", colorDouble: "Colour — double side (per sheet)",
+    a3Extra: "A3 extra (per page)", photo: "Photo print (per image)",
+    staple: "Staple (per copy)", spiral: "Spiral binding (per copy)", minOrder: "Minimum order amount"
+  };
+  document.getElementById("rateInputs").innerHTML = Object.keys(LABELS).map(k =>
+    `<div class="rate-row"><span>${LABELS[k]}</span>
+     <input type="number" step="0.5" id="r_${k}" value="${rates[k] ?? 0}"></div>`).join("");
+  renderCustomRateInputs();
+  document.getElementById("discOn").checked = !!shop.discountOn;
+  document.getElementById("discPct").value = shop.discountPct;
+  document.getElementById("discText").value = shop.discountText;
+  document.getElementById("upiId").value = shop.upi;
+  document.getElementById("advPct").value = shop.advancePct;
+  document.getElementById("shopPhoneView").textContent = "+91 83186 40642 (.env se)";
+  document.getElementById("otpProviderView").textContent = "server-configured";
+  api("/admin/owner-status").then(s => {
+    document.getElementById("ownerEmailView").textContent = s.email || "—";
+  }).catch(() => {});
+  refreshPoolStatus();
+  const prev = document.getElementById("qrPreview");
+  const qrUrl = shop.qrUrl ? (API_BASE.replace(/\/api$/, "") + shop.qrUrl) : "";
+  if (qrUrl) { prev.src = qrUrl; prev.style.display = "inline-block"; document.getElementById("qrEmpty").style.display = "none"; }
+  else { prev.removeAttribute("src"); prev.style.display = "none"; document.getElementById("qrEmpty").style.display = "block"; }
+  renderAllOrders();
+}
+function renderCustomRateInputs() {
+  document.getElementById("customRates").innerHTML = extras.map((e, i) =>
+    `<div class="custom-row">
+      <input type="text" id="cn_${i}" value="${esc(e.name)}" placeholder="Service name">
+      <input type="number" id="cp_${i}" value="${e.price}" step="0.5" placeholder="₹">
+      <button class="x" onclick="delCustomRate(${i})">✕</button>
+     </div>`).join("");
+}
+function addCustomRate() { extras.push({ name: "New service", price: 0 }); renderCustomRateInputs(); }
+function delCustomRate(i) { extras.splice(i, 1); renderCustomRateInputs(); }
+
+async function saveRates() {
+  const LABELS = ["bwSingle", "bwDouble", "colorSingle", "colorDouble", "a3Extra", "photo", "staple", "spiral", "minOrder"];
+  const newRates = {};
+  LABELS.forEach(k => { newRates[k] = Number(document.getElementById("r_" + k).value) || 0; });
+  const newExtras = extras.map((e, i) => ({
+    name: (document.getElementById("cn_" + i)?.value || "Service").trim(),
+    price: Number(document.getElementById("cp_" + i)?.value) || 0
+  })).filter(e => e.name);
+  try {
+    const r = await api("/admin/config", {
+      method: "PUT", headers: authHeader(),
+      body: JSON.stringify({ rates: newRates, extras: newExtras })
+    });
+    rates = r.config.rates; extras = r.config.extras; shop = r.config.shop;
+    renderCustomRateInputs(); renderExtras(); renderRateCard(); quote();
+    msg("rateMsg", "Rates save ho gaye. Students ko turant naya total dikhega.", "ok");
+  } catch (e) { msg("rateMsg", e.message, "bad"); }
+}
+async function resetRates() {
+  const DEFAULT = { bwSingle: 1, bwDouble: 1.6, colorSingle: 5, colorDouble: 9, a3Extra: 2, photo: 10, staple: 5, spiral: 30, minOrder: 5 };
+  try {
+    const r = await api("/admin/config", { method: "PUT", headers: authHeader(), body: JSON.stringify({ rates: DEFAULT, extras: [] }) });
+    rates = r.config.rates; extras = r.config.extras;
+    showOwner(); renderExtras(); renderRateCard(); quote();
+    msg("rateMsg", "Default rates wapas aa gaye.", "ok");
+  } catch (e) { msg("rateMsg", e.message, "bad"); }
+}
+async function saveShop() {
+  const body = {
+    shop: {
+      discountOn: document.getElementById("discOn").checked,
+      discountPct: Number(document.getElementById("discPct").value) || 0,
+      discountText: document.getElementById("discText").value.trim() || "Limited time offer",
+      upi: document.getElementById("upiId").value.trim(),
+      advancePct: Number(document.getElementById("advPct").value) || 50
+    }
+  };
+  try {
+    const r = await api("/admin/config", { method: "PUT", headers: authHeader(), body: JSON.stringify(body) });
+    shop = r.config.shop;
+    renderPromo(); renderRateCard(); quote();
+    msg("discMsg", shop.discountOn ? shop.discountPct + "% offer LIVE hai — home page par banner dikh raha hai." : "Offer band kar diya gaya.", "ok");
+    msg("qrMsg", "Payment settings save ho gayi.", "ok");
+  } catch (e) { msg("discMsg", e.message, "bad"); msg("qrMsg", e.message, "bad"); }
+}
+async function removeQr() {
+  // QR file backend par static rehti hai; UI se hataane ke liye shop.qrUrl clear karna future enhancement hai.
+  msg("qrMsg", "Naya QR upload karke purane ko replace kar do.", "info");
+}
+document.getElementById("qrInput").addEventListener("change", async function () {
+  const f = this.files[0]; this.value = "";
+  if (!f || !f.type.startsWith("image/")) return msg("qrMsg", "Image file hi upload karo.", "bad");
+  try {
+    const fd = new FormData(); fd.append("qr", f);
+    const res = await fetch(API_BASE + "/admin/qr", { method: "POST", headers: authHeader(), body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Upload fail hua.");
+    shop.qrUrl = data.qrUrl;
+    showOwner();
+    msg("qrMsg", "QR upload ho gaya — ab payment step par dikhega.", "ok");
+  } catch (e) { msg("qrMsg", e.message, "bad"); }
+});
+async function renderAllOrders() {
+  const t = document.getElementById("allOrders");
+  try {
+    const r = await api("/admin/orders", { headers: authHeader() });
+    if (!r.orders.length) { t.innerHTML = "<tr><td>Koi order nahi aaya.</td></tr>"; return; }
+    t.innerHTML = "<tr><th>ID</th><th>Student</th><th>Phone</th><th>Job</th><th>Total</th><th>Advance / UTR</th></tr>" +
+      r.orders.map(o => `<tr><td class="mono">${o.id}</td><td>${esc(o.name)}</td><td>+${o.phone}</td>
+        <td>${o.price.docPages}p·${o.price.copies}c·${o.job.printType}</td><td>${money(o.price.total)}</td>
+        <td>${money(o.payment.paid)}<br><span class="pill g">${esc(o.payment.utr || "-")}</span></td></tr>`).join("");
+  } catch (e) { t.innerHTML = `<tr><td>${esc(e.message)}</td></tr>`; }
+}
+
+/* ---------------- OTP codes pool (owner) ---------------- */
+async function refreshPoolStatus() {
+  try {
+    const s = await api("/admin/otp-pool", { headers: authHeader() });
+    document.getElementById("poolStatus").textContent =
+      `${s.remaining} codes bache hain · ab tak ${s.addedTotal} add hue · ${s.usedTotal} use ho chuke`;
+    document.getElementById("poolStatus").className = "note " + (s.remaining > 5 ? "ok" : s.remaining > 0 ? "info" : "bad");
+  } catch (e) { msg("poolStatus", e.message, "bad"); }
+}
+document.getElementById("poolFile").addEventListener("change", async function () {
+  const f = this.files[0]; this.value = "";
+  if (!f) return;
+  try {
+    const fd = new FormData(); fd.append("file", f);
+    const r = await fetch(API_BASE + "/admin/otp-pool", { method: "POST", headers: authHeader(), body: fd });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Upload fail hua.");
+    msg("poolMsg", data.added + " naye codes add hue (" + data.remaining + " total bache).", "ok");
+    refreshPoolStatus();
+  } catch (e) { msg("poolMsg", e.message, "bad"); }
+});
+async function uploadPoolText() {
+  const text = v("poolPaste").trim();
+  if (!text) return msg("poolMsg", "Kuch codes paste karo pehle.", "bad");
+  try {
+    const r = await api("/admin/otp-pool", { method: "POST", headers: authHeader(), body: JSON.stringify({ text }) });
+    document.getElementById("poolPaste").value = "";
+    msg("poolMsg", r.added + " naye codes add hue (" + r.remaining + " total bache).", "ok");
+    refreshPoolStatus();
+  } catch (e) { msg("poolMsg", e.message, "bad"); }
+}
+async function clearPool() {
+  try {
+    await api("/admin/otp-pool", { method: "DELETE", headers: authHeader() });
+    msg("poolMsg", "Pool khaali kar diya gaya.", "ok");
+    refreshPoolStatus();
+  } catch (e) { msg("poolMsg", e.message, "bad"); }
+}
+
+/* ---------------- boot ---------------- */
+loadConfig();
+renderMyOrders();
+go((location.hash || "#home").slice(1));
+</script>
+</body>
+</html>
