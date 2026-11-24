@@ -1,98 +1,46 @@
-# PrintCampus Backend
+# 🖨️ Online Print – Online Printing Website
 
-Frontend (`printcampus.html`) ke liye secure backend. Ye teen cheezein browser se hata kar server par le aata hai:
+**Online Print** is a web-based printing platform that makes document printing simple and convenient. Users can access the website to explore printing services and submit their printing requirements online.
 
-| Pehle (browser me) | Ab (server par) |
-|---|---|
-| OTP JS me generate hota tha aur screen par dikhta tha | OTP server par banta hai, HMAC hash hoke store hota hai, WhatsApp/SMS se jaata hai |
-| Owner PIN JS me likha tha | bcrypt password hash + JWT session (8 ghante) |
-| Total browser me calculate hota tha (devtools se badal sakta tha) | Price hamesha server calculate karta hai |
+## ✨ Features
 
----
+- 📄 Online document printing concept
+- 📱 User-friendly website interface
+- 💻 Responsive design
+- 🖨️ Convenient printing service access
+- ⚡ Simple and easy navigation
 
-## 1. Setup (5 minute)
+## 🛠️ Technologies Used
 
-```bash
-cd printcampus-backend
-npm install
-cp .env.example .env
-```
+- HTML5
+- CSS3
+- JavaScript
 
-Secrets generate karo:
+## 🎯 Project Objective
 
-```bash
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"   # JWT_SECRET
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"   # OTP_PEPPER
-npm run hash -- "MeraStrongPassword123"                                     # OWNER_PASSWORD_HASH
-```
+The objective of Online Print is to bring traditional printing services to an online platform and make the printing process more accessible and convenient for users.
 
-Teeno values `.env` me paste karo, phir:
+## 🚀 Future Improvements
 
-```bash
-npm run dev      # http://localhost:4000
-```
+- PDF and image upload
+- Online order placement
+- Printing price calculator
+- Order status tracking
+- Online payment integration
+- User dashboard
 
-Development me `OTP_PROVIDER=console` — OTP terminal par print hota hai aur API response me `devCode` aata hai. **Production me ye apne aap band ho jaata hai** (`NODE_ENV=production`).
+## 👨‍💻 Developer
 
----
+**Abhishek Singh**  
+B.Tech – Computer Science & Engineering (Data Science & AI)  
+Shri Ramswaroop Memorial University, Lucknow
 
-## 2. OTP provider chuno
-
-`.env` me `OTP_PROVIDER` set karo:
-
-**`whatsapp`** — Meta WhatsApp Cloud API. Free tier hai, par ek approved **Authentication template** chahiye (Meta Business Manager → Message Templates)। `WA_TOKEN`, `WA_PHONE_NUMBER_ID` bharo. Isi se shop ko order notification bhi apne aap chala jaata hai.
-
-**`msg91`** — India SMS, sabse sasta aur sabse jaldi setup hota hai. DLT registration + template ID chahiye.
-
-**`twilio`** — International SMS, setup aasaan, rate mehnga.
-
-Provider badalne par baaki code me kuch nahi badalna — sirf env value.
+- **GitHub:** [abhishekthakur6464gb](https://github.com/abhishekthakur6464gb)
+- **LinkedIn:** [Abhishek Singh](https://www.linkedin.com/in/abhishek-thakur-7bb24a381/)
+- **Email:** abhishekthakur6464@gmail.com
 
 ---
 
-## 3. API
+⭐ If you like this project, feel free to explore and share your feedback!
 
-| Method | Route | Auth | Kaam |
-|---|---|---|---|
-| GET | `/api/orders/config` | — | rates, extras, offer, QR URL |
-| POST | `/api/orders/quote` | — | live total (server calculated) |
-| POST | `/api/otp/send` | — | OTP bhejo (`{phone}`) |
-| POST | `/api/otp/verify` | — | OTP check → `verifyToken` (20 min) |
-| POST | `/api/files` | verifyToken | PDF/image upload |
-| POST | `/api/orders` | verifyToken | order banao, price server se |
-| POST | `/api/orders/:id/payment` | verifyToken | 50% advance ka UTR + shop notification |
-| POST | `/api/admin/login` | — | owner JWT |
-| PUT | `/api/admin/config` | owner JWT | rates / extras / offer / advance % |
-| POST | `/api/admin/qr` | owner JWT | payment QR upload |
-| GET | `/api/admin/orders` | owner JWT | saare orders |
-| PATCH | `/api/admin/orders/:id` | owner JWT | status: PRINTING / READY / DELIVERED |
-
-### OTP security jo pehle nahi tha
-- Plain OTP kabhi store nahi hota — sirf `HMAC-SHA256(phone:code, OTP_PEPPER)`
-- 5 minute expiry, one-time use
-- 5 galat attempt par OTP dead
-- 60 second resend cooldown, 5 OTP per number per hour
-- `crypto.timingSafeEqual` se compare (timing attack se bachav)
-- Order me phone client se nahi, **token se** liya jaata hai — koi doosre ke number par order nahi bana sakta
-
----
-
-## 4. Deploy
-
-Render / Railway / Fly.io par direct chal jaayega:
-- Build: `npm install`, Start: `npm start`
-- `.env` ki saari values dashboard ke Environment section me daalo
-- `NODE_ENV=production` aur `CORS_ORIGIN` me apni website ka asli domain
-- `data/` aur `uploads/` ke liye persistent disk lagao, warna restart par data udd jayega
-
-## 5. Database upgrade
-
-Abhi `src/store.js` ek JSON file use karta hai — college project ke liye kaafi hai. Firestore ya MongoDB par jaana ho to sirf `store.js` ke `get/save/update` badlo, baaki koi file touch nahi hogi.
-
-Firestore version:
-```js
-const { getFirestore } = require("firebase-admin/firestore");
-const db = getFirestore();
-// db.collection("orders").doc(id).set(order)
-// db.collection("config").doc("main").get()
-```
+**Made with ❤️ by Abhishek Singh**
